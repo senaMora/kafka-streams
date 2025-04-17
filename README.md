@@ -1,1 +1,1 @@
-![High-Level Architecture](https://github.com/senaMora/kafka-streams/src/main/resources/images/overview.png)
+![High-Level Architecture](https://github.com/senaMora/kafka-streams/edit/main/README.md)
