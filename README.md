@@ -59,6 +59,18 @@ Below is a simple architecture diagram illustrating Kafka Streams workflow:
 
 ![Kafka Streams Diagram](https://github.com/senaMora/kafka-streams/blob/main/src/main/resources/images/overview.png)
 
+## Sample Output from Kafka Streams Application
+
+The image below shows the result of processing messages with Kafka Streams. The input topic contains simple sentences, which the stream splits into words and counts. The resulting word counts are written to the output topic.
+
+- Input:
+    - `This is the kafka is a statement`
+    - `This is a cat`
+- Output:
+    - Word counts like: `this: 2`, `is: 3`, `a: 2`, `cat: 1`, etc.
+
+![Kafka Streams Word Count Result](https://github.com/senaMora/kafka-streams/blob/main/src/main/resources/images/results.png)
+
 ## How to Run
 
 1. Ensure Kafka is running locally.
@@ -69,4 +81,4 @@ Below is a simple architecture diagram illustrating Kafka Streams workflow:
 
 ---
 
-© Your Project - Kafka Streams Example
+© senaMora Projects - Kafka Streams Example
