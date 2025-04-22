@@ -1,63 +1,92 @@
 package org.example.kafkastreams.configs;
 
-import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.common.serialization.Serde;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.KeyValue;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.KStream;
+import org.example.kafkastreams.dtos.DataModel;
+import org.example.kafkastreams.services.KStreamProcessor;
+import org.example.kafkastreams.services.KTableProcessor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.kafka.annotation.EnableKafkaStreams;
+import org.springframework.kafka.annotation.KafkaStreamsDefaultConfiguration;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
+import org.springframework.kafka.config.KafkaStreamsConfiguration;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
+import static org.apache.kafka.streams.StreamsConfig.*;
 
-@Slf4j
+@EnableKafka
+@EnableKafkaStreams
 @Configuration
 public class KafkaStreamsConfig {
 
-    @Value("${kafka.input.topic}")
+    @Value(value = "${spring.kafka.bootstrap-servers}")
+    private String bootstrapAddress;
+
+    @Value(value = "${spring.kafka.topic.demo}")
     private String inputTopic;
 
-    @Value("${kafka.output.topic}")
-    private String outputTopic;
+    private final KStreamProcessor kstreamProcessor;
 
-    private static final Serde<String> STRING_SERDE = Serdes.String();
-    private static final Serde<Long> LONG_SERDE = Serdes.Long();
+    private final KTableProcessor ktableProcessor;
 
+    public KafkaStreamsConfig(KStreamProcessor kstreamProcessor, KTableProcessor ktableProcessor) {
+        this.kstreamProcessor = kstreamProcessor;
+        this.ktableProcessor = ktableProcessor;
+    }
+
+    @Bean(name = KafkaStreamsDefaultConfiguration.DEFAULT_STREAMS_CONFIG_BEAN_NAME)
+    public KafkaStreamsConfiguration kStreamsConfig() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(APPLICATION_ID_CONFIG, "streams-app");
+        props.put(BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
+        props.put(DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+        props.put(DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.Double().getClass().getName());
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+        return new KafkaStreamsConfiguration(props);
+    }
 
     @Bean
-    public KStream<String, String> kStream(StreamsBuilder streamsBuilder) {
+    public ConsumerFactory<String, String> consumerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "demo-1");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
 
-        KStream<String, String> stream = streamsBuilder.stream(
-                inputTopic, Consumed.with(STRING_SERDE, STRING_SERDE));
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
 
-        log.info("consuming");
-//        stream
-//                .mapValues((ValueMapper<String, String>) String::toUpperCase)
-//                .to(outputTopic);
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
 
+        ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory());
+        return factory;
+    }
 
-//        KTable<String, Long> wordCounts = stream
-//                .mapValues((ValueMapper<String, String>) String::toLowerCase)
-//                .mapValues(value -> value.toUpperCase())
-//                .flatMapValues(value -> Arrays.asList(value.split("\\W+")))
-//                .groupBy((key, word) -> word, Grouped.with(STRING_SERDE, STRING_SERDE))
-//                .count();
+    @Bean
+    public KStream<String, DataModel> kStream(StreamsBuilder kStreamBuilder) {
 
+        KStream<String, DataModel> stream = kStreamBuilder.stream(
+                inputTopic, Consumed.with(Serdes.String(), new DataModelSerde()));
 
+        //Process KStream
+        this.kstreamProcessor.process(stream);
 
-        KTable<String, Long> wordCounts = stream
-                .flatMapValues(value -> Arrays.asList(value.toLowerCase().split("\\W+"))) // split into words
-                .map((key, word) -> KeyValue.pair(word, word))                             // set word as new key
-                .groupByKey(Grouped.with(STRING_SERDE, STRING_SERDE))                      // group by word
-                .count(Materialized.with(STRING_SERDE, LONG_SERDE));                       // count
-
-        wordCounts
-                .toStream()
-                .map((word, count) -> KeyValue.pair(word, count.toString()))              // convert count to string
-                .to(outputTopic, Produced.with(STRING_SERDE, STRING_SERDE));              // write to output topic
+        //Process KTable
+        this.ktableProcessor.process(stream);
 
         return stream;
     }

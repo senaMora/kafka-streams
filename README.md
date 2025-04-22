@@ -9,6 +9,13 @@
 - [Architecture Overview](#architecture-overview)
 - [How to Run](#how-to-run)
 
+## Project Structure
+
+There are **two separate projects** in this repository:
+
+1. **Basic Kafka Streams App** – A minimal example covering fundamental stream operations. **This README file includes details specifically for this basic approach only.**
+2. **Kafka Streams Demo App** – A more complete simulation based on [this Medium tutorial](https://medium.com/@tobintom/introducing-kafka-streams-with-spring-boot-be1d6f7f3b76), including state stores, aggregation, and realistic data flow.
+
 ## Overview
 
 Kafka Streams is a Java library provided by Apache Kafka that allows you to build real-time applications and microservices that process data directly from Kafka topics. It enables processing of data in real-time directly from Kafka topics.
